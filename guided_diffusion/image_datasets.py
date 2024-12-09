@@ -7,6 +7,31 @@ from mpi4py import MPI
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
 
+import OpenEXR, Imath
+import os
+# os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+
+def read_openexr_to_numpy(file_path):
+    # 打开 EXR 文件
+    exr_file = OpenEXR.InputFile(file_path)
+    
+    # 获取图像尺寸
+    dw = exr_file.header()['dataWindow']
+    width = dw.max.x - dw.min.x + 1
+    height = dw.max.y - dw.min.y + 1
+
+    # 读取 RGB 通道
+    channels = ['R', 'G', 'B']
+    data = {channel: exr_file.channel(channel, Imath.PixelType(Imath.PixelType.FLOAT)) for channel in channels}
+
+    # 转换为 NumPy 数组
+    img = np.zeros((height, width, 3), dtype=np.float32)
+    for i, channel in enumerate(channels):
+        img[..., i] = np.fromstring(data[channel], dtype=np.float32).reshape(height, width)
+
+    exr_file.close()
+    return img
+
 
 def load_data(
     *,
@@ -38,7 +63,8 @@ def load_data(
     """
     if not data_dir:
         raise ValueError("unspecified data directory")
-    all_files = _list_image_files_recursively(data_dir)
+    # all_files = _list_image_files_recursively(data_dir)
+    all_dirs = _list_image_dir_recursively(data_dir)
     classes = None
     if class_cond:
         # Assume classes are the first part of the filename,
@@ -48,7 +74,7 @@ def load_data(
         classes = [sorted_classes[x] for x in class_names]
     dataset = ImageDataset(
         image_size,
-        all_files,
+        all_dirs,
         classes=classes,
         shard=MPI.COMM_WORLD.Get_rank(),
         num_shards=MPI.COMM_WORLD.Get_size(),
@@ -78,6 +104,12 @@ def _list_image_files_recursively(data_dir):
             results.extend(_list_image_files_recursively(full_path))
     return results
 
+def _list_image_dir_recursively(data_dir):
+    all_items = os.listdir(data_dir)
+    # 过滤出所有子目录并获取其完整路径
+    subdirectories = [os.path.join(data_dir, item) for item in all_items if os.path.isdir(os.path.join(data_dir, item))]
+    return subdirectories
+
 
 class ImageDataset(Dataset):
     def __init__(
@@ -100,33 +132,69 @@ class ImageDataset(Dataset):
     def __len__(self):
         return len(self.local_images)
 
-    def __getitem__(self, idx):
-        path = self.local_images[idx]
-        with bf.BlobFile(path, "rb") as f:
-            pil_image = Image.open(f)
-            pil_image.load()
-        pil_image = pil_image.convert("RGB")
+    # def __getitem__(self, idx):
+    #     path = self.local_images[idx]
+    #     with bf.BlobFile(path, "rb") as f:
+    #         pil_image = Image.open(f)
+    #         pil_image.load()
+    #     pil_image = pil_image.convert("RGB")
 
-        if self.random_crop:
-            arr = random_crop_arr(pil_image, self.resolution)
-        else:
-            arr = center_crop_arr(pil_image, self.resolution)
+    #     if self.random_crop:
+    #         arr = random_crop_arr(pil_image, self.resolution)
+    #     else:
+    #         arr = center_crop_arr(pil_image, self.resolution)
+
+    #     if self.random_flip and random.random() < 0.5:
+    #         arr = arr[:, ::-1]
+
+    #     arr = arr.astype(np.float32) / 127.5 - 1
+
+    #     out_dict = {}
+    #     if self.local_classes is not None:
+    #         out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
+    #     return np.transpose(arr, [2, 0, 1]), out_dict
+
+    def __getitem__(self, idx):
+        # TODO: not support class
+        path = self.local_images[idx]
+        with bf.BlobFile(path+"/rgb/0001.exr", "rb") as f:
+            arr = read_openexr_to_numpy(f)
+
+        with bf.BlobFile(path+"/depth/0001.exr", "rb") as f:
+            depth_arr = read_openexr_to_numpy(f)
+
+
+        # if self.random_crop:
+        #     arr = random_crop_arr(rgb_pil_image, self.resolution)
+        #     depth_arr =  random_crop_arr(depth_pil_image, self.resolution)
+        # else:
+        #     arr = center_crop_arr(rgb_pil_image, self.resolution)
+        #     depth_arr =  center_crop_arr(depth_pil_image, self.resolution)
 
         if self.random_flip and random.random() < 0.5:
             arr = arr[:, ::-1]
-
-        arr = arr.astype(np.float32) / 127.5 - 1
-
+            depth_arr = depth_arr[:, ::-1]
         out_dict = {}
         if self.local_classes is not None:
             out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
-        return np.transpose(arr, [2, 0, 1]), out_dict
+
+        combined_arr = np.concatenate([arr, depth_arr[:, :, 0:1]], axis=-1)
+        combined_arr = combined_arr * 2.0 - 1.0
+        # print(  combined_arr.shape)
+        return np.transpose(combined_arr, [2, 0, 1]), out_dict
+
 
 
 def center_crop_arr(pil_image, image_size):
     # We are not on a new enough PIL to support the `reducing_gap`
     # argument, which uses BOX downsampling at powers of two first.
     # Thus, we do it by hand to improve downsample quality.
+    arr = np.array(pil_image)
+    
+    # 如果图像的宽高已经符合目标大小，不进行裁剪
+    if arr.shape[0] == image_size and arr.shape[1] == image_size:
+        return arr
+
     while min(*pil_image.size) >= 2 * image_size:
         pil_image = pil_image.resize(
             tuple(x // 2 for x in pil_image.size), resample=Image.BOX

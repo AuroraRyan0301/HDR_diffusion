@@ -162,12 +162,11 @@ def create_model(
     attention_ds = []
     for res in attention_resolutions.split(","):
         attention_ds.append(image_size // int(res))
-
     return UNetModel(
         image_size=image_size,
-        in_channels=3,
+        in_channels=4,
         model_channels=num_channels,
-        out_channels=(3 if not learn_sigma else 6),
+        out_channels=(4 if not learn_sigma else 8),
         num_res_blocks=num_res_blocks,
         attention_resolutions=tuple(attention_ds),
         dropout=dropout,

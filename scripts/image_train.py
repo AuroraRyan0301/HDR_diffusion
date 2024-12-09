@@ -15,8 +15,14 @@ from guided_diffusion.script_util import (
 )
 from guided_diffusion.train_util import TrainLoop
 
+import wandb
+
 
 def main():
+
+    wandb.init(project="diffusion_model", entity="auroraryan0301")
+
+
     args = create_argparser().parse_args()
 
     dist_util.setup_dist()

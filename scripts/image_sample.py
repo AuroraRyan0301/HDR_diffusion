@@ -9,6 +9,8 @@ import os
 import numpy as np
 import torch as th
 import torch.distributed as dist
+import OpenEXR
+import Imath
 
 from guided_diffusion import dist_util, logger
 from guided_diffusion.script_util import (
@@ -18,7 +20,23 @@ from guided_diffusion.script_util import (
     add_dict_to_argparser,
     args_to_dict,
 )
+def save_exr(filename, image):
+    # 获取图像的形状
+    height, width, channels = image.shape
 
+    # 创建一个 OpenEXR 输出文件
+    exr_file = OpenEXR.OutputFile(filename, OpenEXR.Header(width, height))
+
+    # 为每个通道创建一个数组
+    r = image[..., 0].astype(np.float32).tobytes()
+    g = image[..., 1].astype(np.float32).tobytes()
+    b = image[..., 2].astype(np.float32).tobytes()
+
+    # 写入通道数据
+    exr_file.writePixels({'R': r, 'G': g, 'B': b})
+
+    # 关闭文件
+    exr_file.close()
 
 def main():
     args = create_argparser().parse_args()
@@ -79,12 +97,15 @@ def main():
         label_arr = label_arr[: args.num_samples]
     if dist.get_rank() == 0:
         shape_str = "x".join([str(x) for x in arr.shape])
-        out_path = os.path.join(logger.get_dir(), f"samples_{shape_str}.npz")
+        out_path = os.path.join('/root/guided-diffusion/output', f"samples_{shape_str}.npz")
         logger.log(f"saving to {out_path}")
         if args.class_cond:
             np.savez(out_path, arr, label_arr)
         else:
             np.savez(out_path, arr)
+        for i, arr_slice in enumerate(arr):
+            save_exr(os.path.join('/root/guided-diffusion/output', f"samples_{i}.exr"), arr_slice/255.0)
+
 
     dist.barrier()
     logger.log("sampling complete")
@@ -93,8 +114,8 @@ def main():
 def create_argparser():
     defaults = dict(
         clip_denoised=True,
-        num_samples=10000,
-        batch_size=16,
+        num_samples=1,
+        batch_size=1,
         use_ddim=False,
         model_path="",
     )

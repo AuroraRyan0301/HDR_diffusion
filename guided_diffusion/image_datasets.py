@@ -66,7 +66,7 @@ def load_data(
         raise ValueError("unspecified data directory")
     # all_files = _list_image_files_recursively(data_dir)
     # all_dirs = _list_image_dir_recursively(data_dir)
-    all_depth_exr_path = _list_depth_path_recursively(data_dir)
+    all_rgb_exr_path = _list_rgb_path_recursively(data_dir)
     classes = None
     if class_cond:
         # Assume classes are the first part of the filename,
@@ -76,7 +76,7 @@ def load_data(
         classes = [sorted_classes[x] for x in class_names]
     dataset = ImageDataset(
         image_size,
-        all_depth_exr_path,
+        all_rgb_exr_path,
         classes=classes,
         shard=MPI.COMM_WORLD.Get_rank(),
         num_shards=MPI.COMM_WORLD.Get_size(),
@@ -112,14 +112,14 @@ def _list_image_dir_recursively(data_dir):
     subdirectories = [os.path.join(data_dir, item) for item in all_items if os.path.isdir(os.path.join(data_dir, item))]
     return subdirectories
 
-def _list_depth_path_recursively(data_dir):
-    all_depth_paths = []
+def _list_rgb_path_recursively(data_dir):
+    all_rgb_paths = []
     for scene in os.listdir(data_dir):
         scene_path = os.path.join(data_dir, scene)
         for filename in os.listdir(scene_path):
-            if filename.startswith('depth') and filename.endswith('.exr'):
-                all_depth_paths.append(os.path.join(scene_path, filename))
-    return all_depth_paths
+            if filename.startswith('rgb') and filename.endswith('.exr'):
+                all_rgb_paths.append(os.path.join(scene_path, filename))
+    return all_rgb_paths
 
 
 class ImageDataset(Dataset):
@@ -168,13 +168,12 @@ class ImageDataset(Dataset):
     def __getitem__(self, idx):
         # TODO: not support class
         path = self.local_images[idx]
-        numbers = int(re.findall(r'\d+', os.path.basename(path))[0])
-        numbers = int(numbers // 10000)
-        with bf.BlobFile(os.path.dirname(path) + "/rgb_{}.exr".format(numbers), "rb") as f:
-            arr = read_openexr_to_numpy(f)
+        # numbers = int(re.findall(r'\d+', os.path.basename(path))[0])
+        # with bf.BlobFile(os.path.dirname(path) + "/rgb_{}.exr".format(numbers), "rb") as f:
+        #     arr = read_openexr_to_numpy(f)
 
         with bf.BlobFile(path, "rb") as f:
-            depth_arr = read_openexr_to_numpy(f)
+           arr = read_openexr_to_numpy(f)
 
 
         # if self.random_crop:
@@ -186,13 +185,13 @@ class ImageDataset(Dataset):
 
         if self.random_flip and random.random() < 0.5:
             arr = arr[:, ::-1]
-            depth_arr = depth_arr[:, ::-1]
+            # depth_arr = depth_arr[:, ::-1]
         out_dict = {}
         if self.local_classes is not None:
             out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
 
-        combined_arr = np.concatenate([arr, depth_arr[:, :, 0:1]], axis=-1)
-        combined_arr = combined_arr * 2.0 - 1.0
+        # combined_arr = np.concatenate([arr, depth_arr[:, :, 0:1]], axis=-1)
+        combined_arr = arr * 2.0 - 1.0
         # print(  combined_arr.shape)
         return np.transpose(combined_arr, [2, 0, 1]), out_dict
 

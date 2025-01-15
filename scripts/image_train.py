@@ -20,7 +20,7 @@ import wandb
 
 def main():
 
-    wandb.init(project="diffusion_model", entity="auroraryan0301")
+    wandb.init(project="diffusion_model_rgb", entity="auroraryan0301")
 
 
     args = create_argparser().parse_args()

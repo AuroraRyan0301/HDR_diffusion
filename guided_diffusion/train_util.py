@@ -276,7 +276,7 @@ def get_blob_logdir():
     # You can change this to be a separate path to save checkpoints to
     # a blobstore or some external drive.
     # return logger.get_dir()
-    return "/data/outputs/" + os.path.basename(os.path.normpath(logger.get_dir()))
+    return "/data2/outputs/" + os.path.basename(os.path.normpath(logger.get_dir()))
 
 
 def find_resume_checkpoint():

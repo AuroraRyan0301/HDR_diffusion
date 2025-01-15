@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, Dataset
 
 import OpenEXR, Imath
 import os
+import re
 # os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 
 def read_openexr_to_numpy(file_path):
@@ -64,7 +65,8 @@ def load_data(
     if not data_dir:
         raise ValueError("unspecified data directory")
     # all_files = _list_image_files_recursively(data_dir)
-    all_dirs = _list_image_dir_recursively(data_dir)
+    # all_dirs = _list_image_dir_recursively(data_dir)
+    all_depth_exr_path = _list_depth_path_recursively(data_dir)
     classes = None
     if class_cond:
         # Assume classes are the first part of the filename,
@@ -74,7 +76,7 @@ def load_data(
         classes = [sorted_classes[x] for x in class_names]
     dataset = ImageDataset(
         image_size,
-        all_dirs,
+        all_depth_exr_path,
         classes=classes,
         shard=MPI.COMM_WORLD.Get_rank(),
         num_shards=MPI.COMM_WORLD.Get_size(),
@@ -109,6 +111,15 @@ def _list_image_dir_recursively(data_dir):
     # 过滤出所有子目录并获取其完整路径
     subdirectories = [os.path.join(data_dir, item) for item in all_items if os.path.isdir(os.path.join(data_dir, item))]
     return subdirectories
+
+def _list_depth_path_recursively(data_dir):
+    all_depth_paths = []
+    for scene in os.listdir(data_dir):
+        scene_path = os.path.join(data_dir, scene)
+        for filename in os.listdir(scene_path):
+            if filename.startswith('depth') and filename.endswith('.exr'):
+                all_depth_paths.append(os.path.join(scene_path, filename))
+    return all_depth_paths
 
 
 class ImageDataset(Dataset):
@@ -157,10 +168,12 @@ class ImageDataset(Dataset):
     def __getitem__(self, idx):
         # TODO: not support class
         path = self.local_images[idx]
-        with bf.BlobFile(path+"/rgb/0001.exr", "rb") as f:
+        numbers = int(re.findall(r'\d+', os.path.basename(path))[0])
+        numbers = int(numbers // 10000)
+        with bf.BlobFile(os.path.dirname(path) + "/rgb_{}.exr".format(numbers), "rb") as f:
             arr = read_openexr_to_numpy(f)
 
-        with bf.BlobFile(path+"/depth/0001.exr", "rb") as f:
+        with bf.BlobFile(path, "rb") as f:
             depth_arr = read_openexr_to_numpy(f)
 
 

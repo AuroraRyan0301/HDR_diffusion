@@ -66,7 +66,7 @@ def load_data(
         raise ValueError("unspecified data directory")
     # all_files = _list_image_files_recursively(data_dir)
     # all_dirs = _list_image_dir_recursively(data_dir)
-    all_depth_exr_path = _list_depth_path_recursively(data_dir)
+    all_exr_path = _list_path_recursively(data_dir)
     classes = None
     if class_cond:
         # Assume classes are the first part of the filename,
@@ -76,7 +76,7 @@ def load_data(
         classes = [sorted_classes[x] for x in class_names]
     dataset = ImageDataset(
         image_size,
-        all_depth_exr_path,
+        all_exr_path,
         classes=classes,
         shard=MPI.COMM_WORLD.Get_rank(),
         num_shards=MPI.COMM_WORLD.Get_size(),
@@ -112,14 +112,24 @@ def _list_image_dir_recursively(data_dir):
     subdirectories = [os.path.join(data_dir, item) for item in all_items if os.path.isdir(os.path.join(data_dir, item))]
     return subdirectories
 
-def _list_depth_path_recursively(data_dir):
-    all_depth_paths = []
+def _list_path_recursively(data_dir):
+    all_depth_paths_pair = []
     for scene in os.listdir(data_dir):
         scene_path = os.path.join(data_dir, scene)
         for filename in os.listdir(scene_path):
             if filename.startswith('depth') and filename.endswith('.exr'):
-                all_depth_paths.append(os.path.join(scene_path, filename))
-    return all_depth_paths
+                numbers_match = re.findall(r'\d+', filename)
+                if not numbers_match:
+                    continue  # 跳过未匹配到数字的文件
+                numbers = int(numbers_match[0]) // 10000
+                # 构造对应的 RGB 文件路径
+                depth_path = os.path.join(scene_path, filename)
+                rgb_path = os.path.join(scene_path, f"rgb_{numbers}.exr")
+                # 检查文件是否存在
+                if os.path.exists(depth_path) and os.path.exists(rgb_path):
+                    all_depth_paths_pair.append([depth_path, rgb_path])
+                
+    return all_depth_paths_pair
 
 
 class ImageDataset(Dataset):
@@ -168,12 +178,10 @@ class ImageDataset(Dataset):
     def __getitem__(self, idx):
         # TODO: not support class
         path = self.local_images[idx]
-        numbers = int(re.findall(r'\d+', os.path.basename(path))[0])
-        numbers = int(numbers // 10000)
-        with bf.BlobFile(os.path.dirname(path) + "/rgb_{}.exr".format(numbers), "rb") as f:
+        with bf.BlobFile(path[1], "rb") as f:
             arr = read_openexr_to_numpy(f)
 
-        with bf.BlobFile(path, "rb") as f:
+        with bf.BlobFile(path[0], "rb") as f:
             depth_arr = read_openexr_to_numpy(f)
 
 

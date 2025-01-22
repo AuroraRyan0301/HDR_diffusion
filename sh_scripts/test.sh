@@ -4,4 +4,4 @@ DIFFUSION_FLAGS="--diffusion_steps 1000 --noise_schedule linear --rescale_learne
 TRAIN_FLAGS="--lr_anneal_steps 120 --lr 2e-5 --batch_size 4"
 
 # 运行训练脚本，并将其放入后台
-python scripts/image_train.py --data_dir /data2/my_ris_v3_final $MODEL_FLAGS $DIFFUSION_FLAGS $TRAIN_FLAGS
+python /root/guided-diffusion/scripts/image_train.py --data_dir /data2/my_ris_v3_final $MODEL_FLAGS $DIFFUSION_FLAGS $TRAIN_FLAGS

@@ -20,7 +20,7 @@ import wandb
 
 def main():
 
-    wandb.init(project="diffusion_model", entity="auroraryan0301")
+    wandb.init(project="ring_diffusion_model", entity="auroraryan0301")
 
 
     args = create_argparser().parse_args()
@@ -74,7 +74,7 @@ def create_argparser():
         microbatch=-1,  # -1 disables microbatches
         ema_rate="0.9999",  # comma-separated list of EMA values
         log_interval=10,
-        save_interval=100,
+        save_interval=3000,
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,

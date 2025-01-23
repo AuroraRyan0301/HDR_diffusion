@@ -6,6 +6,7 @@ import math
 
 import torch as th
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 # PyTorch 1.7 has SiLU, but we support PyTorch 1.5.
@@ -19,6 +20,21 @@ class GroupNorm32(nn.GroupNorm):
         return super().forward(x.float()).type(x.dtype)
 
 
+class CircularConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=None):
+        super(CircularConv2d, self).__init__()
+        # 如果未指定 padding，则根据 kernel_size 自动计算
+        if padding is None:
+            padding = (kernel_size - 1) // 2
+        self.padding = padding  # 保存填充大小
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=0)
+
+    def forward(self, x):
+        # 只在水平方向（左右）应用环形填充
+        x = F.pad(x, (self.padding, self.padding, 0, 0), mode='circular')
+        x = F.pad(x, (0, 0, self.padding, self.padding), mode='constant')
+        return self.conv(x)
+
 def conv_nd(dims, *args, **kwargs):
     """
     Create a 1D, 2D, or 3D convolution module.
@@ -29,6 +45,20 @@ def conv_nd(dims, *args, **kwargs):
         return nn.Conv2d(*args, **kwargs)
     elif dims == 3:
         return nn.Conv3d(*args, **kwargs)
+    raise ValueError(f"unsupported dimensions: {dims}")
+
+def ring_conv_nd(dims, *args, **kwargs):
+    """
+    Create a 1D, 2D, or 3D circular convolution module.
+    """
+    if dims == 1:
+        return nn.Conv1d(*args, **kwargs)
+    elif dims == 2:
+        return CircularConv2d(*args, **kwargs)
+    elif dims == 3:
+        # have 3d conv
+        print("have 3d conv")
+        exit()
     raise ValueError(f"unsupported dimensions: {dims}")
 
 

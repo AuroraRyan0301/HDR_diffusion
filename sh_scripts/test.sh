@@ -1,7 +1,7 @@
 # 环境变量配置
 MODEL_FLAGS="--image_size 256 --num_channels 256 --num_res_blocks 3 --num_heads 4 --num_head_channels 64 --num_heads_upsample -1 --learn_sigma True"
 DIFFUSION_FLAGS="--diffusion_steps 1000 --noise_schedule linear --rescale_learned_sigmas False --rescale_timesteps False --use_scale_shift_norm False"
-TRAIN_FLAGS="--resume_checkpoint /data2/outputs/openai-2025-01-23-09-57-32-213938/model076000.pt --lr_anneal_steps 120000 --lr 2e-5 --batch_size 4"
+TRAIN_FLAGS="--resume_checkpoint /data2/outputs/openai-2025-02-18-01-07-19-268200/model018000.pt --lr_anneal_steps 120000 --lr 2e-5 --batch_size 4"
 
 # 运行训练脚本，并将其放入后台
-python /root/guided-diffusion/scripts/image_train.py --data_dir /data2/my_ris_v3_final $MODEL_FLAGS $DIFFUSION_FLAGS $TRAIN_FLAGS
+python /root/guided-diffusion/scripts/image_train.py --data_dir /data2/my_ris_v4_final $MODEL_FLAGS $DIFFUSION_FLAGS $TRAIN_FLAGS

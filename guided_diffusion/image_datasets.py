@@ -6,7 +6,8 @@ import blobfile as bf
 from mpi4py import MPI
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
-
+from tqdm import tqdm
+import json
 import OpenEXR, Imath
 import os
 import re
@@ -111,32 +112,42 @@ def _list_image_dir_recursively(data_dir):
     # 过滤出所有子目录并获取其完整路径
     subdirectories = [os.path.join(data_dir, item) for item in all_items if os.path.isdir(os.path.join(data_dir, item))]
     return subdirectories
-
 def _list_path_recursively(data_dir):
-    # 读取并验证scene.txt
-    scene_txt_path = os.path.join(data_dir, 'scene.txt')
-    if not os.path.exists(scene_txt_path):
-        raise FileNotFoundError(f"scene.txt not found in {data_dir}")
+    cache_file = os.path.join(data_dir, 'rgbd_pairs.json')
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as f:
+            print(f"Loading cached file pairs from {cache_file}")
+            return json.load(f)
+    else:
+        raise FileNotFoundError(f"rgbd_pairs.json not found in {data_dir}")
+
+
+# def _list_path_recursively(data_dir):
+#     # 读取并验证scene.txt
+#     print("read exr")
+#     scene_txt_path = os.path.join(data_dir, 'scene.txt')
+#     if not os.path.exists(scene_txt_path):
+#         raise FileNotFoundError(f"scene.txt not found in {data_dir}")
     
-    with open(scene_txt_path, 'r') as f:
-        scene_paths = [line.strip() for line in f if line.strip()]
-    all_depth_paths_pair = []
-    for scene_path in scene_paths:
-        scene_path = os.path.join(data_dir,scene_path)
-        for filename in os.listdir(scene_path):
-            if filename.startswith('depth') and filename.endswith('.exr'):
-                numbers_match = re.findall(r'\d+', filename)
-                if not numbers_match:
-                    continue  # 跳过未匹配到数字的文件
-                numbers = int(numbers_match[0]) // 10000
-                # 构造对应的 RGB 文件路径
-                depth_path = os.path.join(scene_path, filename)
-                rgb_path = os.path.join(scene_path, f"rgb_{numbers}.exr")
-                # 检查文件是否存在
-                if os.path.exists(depth_path) and os.path.exists(rgb_path):
-                    all_depth_paths_pair.append([depth_path, rgb_path])
+#     with open(scene_txt_path, 'r') as f:
+#         scene_paths = [line.strip() for line in f if line.strip()]
+#     all_depth_paths_pair = []
+#     for scene_path in tqdm(scene_paths):
+#         scene_path = os.path.join(data_dir,scene_path)
+#         for filename in os.listdir(scene_path):
+#             if filename.startswith('depth') and filename.endswith('.exr'):
+#                 numbers_match = re.findall(r'\d+', filename)
+#                 if not numbers_match:
+#                     continue  # 跳过未匹配到数字的文件
+#                 numbers = int(numbers_match[0]) // 10000
+#                 # 构造对应的 RGB 文件路径
+#                 depth_path = os.path.join(scene_path, filename)
+#                 rgb_path = os.path.join(scene_path, f"rgb_{numbers}.exr")
+#                 # 检查文件是否存在
+#                 if os.path.exists(depth_path) and os.path.exists(rgb_path):
+#                     all_depth_paths_pair.append([depth_path, rgb_path])
                 
-    return all_depth_paths_pair
+#     return all_depth_paths_pair
 
 
 class ImageDataset(Dataset):

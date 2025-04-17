@@ -4,4 +4,4 @@ DIFFUSION_FLAGS="--diffusion_steps 1000 --noise_schedule linear --rescale_learne
 TRAIN_FLAGS="--lr_anneal_steps 120000 --lr 2e-5 --batch_size 4"
 
 # 运行训练脚本，并将其放入后台
-python /root/guided-diffusion/scripts/image_train.py --data_dir /data2/infinigen_processed_v0 $MODEL_FLAGS $DIFFUSION_FLAGS $TRAIN_FLAGS
+python3 /root/HDR_diffusion/scripts/image_train.py --data_dir /data2/infinigen_processed_v0 $MODEL_FLAGS $DIFFUSION_FLAGS $TRAIN_FLAGS

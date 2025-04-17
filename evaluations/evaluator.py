@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from functools import partial
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
+import multiprocessing
 from typing import Iterable, Optional, Tuple
 
 import numpy as np
@@ -25,6 +26,7 @@ FID_SPATIAL_NAME = "mixed_6/conv:0"
 
 
 def main():
+    multiprocessing.set_start_method("spawn")  # 或 "forkserver"
     parser = argparse.ArgumentParser()
     parser.add_argument("ref_batch", help="path to reference batch npz file")
     parser.add_argument("sample_batch", help="path to sample batch npz file")

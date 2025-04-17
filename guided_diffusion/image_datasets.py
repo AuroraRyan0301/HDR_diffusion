@@ -113,9 +113,16 @@ def _list_image_dir_recursively(data_dir):
     return subdirectories
 
 def _list_path_recursively(data_dir):
+    # 读取并验证scene.txt
+    scene_txt_path = os.path.join(data_dir, 'scene.txt')
+    if not os.path.exists(scene_txt_path):
+        raise FileNotFoundError(f"scene.txt not found in {data_dir}")
+    
+    with open(scene_txt_path, 'r') as f:
+        scene_paths = [line.strip() for line in f if line.strip()]
     all_depth_paths_pair = []
-    for scene in os.listdir(data_dir):
-        scene_path = os.path.join(data_dir, scene)
+    for scene_path in scene_paths:
+        scene_path = os.path.join(data_dir,scene_path)
         for filename in os.listdir(scene_path):
             if filename.startswith('depth') and filename.endswith('.exr'):
                 numbers_match = re.findall(r'\d+', filename)
